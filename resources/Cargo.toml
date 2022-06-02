@@ -1,0 +1,15 @@
+[package]
+name = "messiah-resources"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+static_assertions = "1.1.0"
+anyhow = "1"
+clap = { version = "3", features = ["derive"] }
+byteorder = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+walkdir = "2"

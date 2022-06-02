@@ -1,2 +1,2 @@
 [workspace]
-members = ["mpk", "texture"]
+members = ["mpk", "texture", "resources"]
