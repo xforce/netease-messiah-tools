@@ -17,3 +17,4 @@ try-insert-ext = "*"
 indicatif = "0.16"
 lz4_flex = { version = "0.9", default-features = false, features = ["std"] }
 walkdir = "2"
+compress = "0.2"

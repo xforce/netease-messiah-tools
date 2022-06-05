@@ -152,6 +152,32 @@ impl MPKFileReader {
                     } else {
                         file_buffer
                     }
+                } else if &magic[..2] == b"\xE2\x06" {
+                    // This is a mangled zlib compressed file
+                    // TODO(alexander): Move handling of these to a new crate
+                    // TODO(alexander): Reduce number of vec allocations
+                    reader.seek(SeekFrom::Start(0))?;
+                    let mut buffer = vec![0; 0 as usize];
+                    reader.read_to_end(&mut buffer)?;
+
+                    let offset = (buffer.len() - 8) % 37;
+                    let end = 128 - offset;
+                    let end = end.min(buffer.len());
+                    // eprintln!("{} {} {}", buffer.len(), offset, end);
+                    let head = &mut buffer[..end];
+                    for x in head.iter_mut() {
+                        *x = *x ^ 154;
+                    }
+                    let end = if end == buffer.len() {
+                        end
+                    } else {
+                        buffer.len() - 8
+                    };
+                    use compress::zlib;
+                    let mut decoder = zlib::Decoder::new(&buffer[..end]);
+                    let mut result_buffer = vec![];
+                    decoder.read_to_end(&mut result_buffer)?;
+                    result_buffer
                 } else {
                     file_buffer
                 };

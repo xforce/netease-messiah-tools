@@ -1,9 +1,11 @@
+use num_enum::TryFromPrimitive;
+
 extern crate static_assertions as sa;
 
 #[allow(non_camel_case_types, dead_code)]
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, TryFromPrimitive)]
 #[repr(u8)]
-enum EPixelFormat {
+pub enum EPixelFormat {
     Unknown = 0,
     A32R32G32B32F = 1,
     A16B16G16R16F = 2,
