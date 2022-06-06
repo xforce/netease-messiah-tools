@@ -133,8 +133,11 @@ impl MPKFileReader {
                 let _ = reader.read_exact(&mut magic);
 
                 // TODO(alexander): This _should_ probably be optional
-                let file_buffer = if magic == b"ZZZ4" {
-                    lz4_flex::decompress_size_prepended(&file_buffer[4..])?
+                let (file_buffer, alt_file_name): (_, Option<String>) = if magic == b"ZZZ4" {
+                    (
+                        lz4_flex::decompress_size_prepended(&file_buffer[4..])?,
+                        None,
+                    )
                 } else if magic == b"CCCC" {
                     let mut magic = vec![0; 4];
                     let _ = reader.read_exact(&mut magic);
@@ -145,12 +148,15 @@ impl MPKFileReader {
                         // There is an unknown "overhang" of 20 bytes at the end, no idea what it is
                         // Ignore for now
                         // _could_ be a sha1 actually
-                        lz4_flex::decompress(
-                            &buffer[..buffer.len() - 20],
-                            uncompressed_size as usize,
-                        )?
+                        (
+                            lz4_flex::decompress(
+                                &buffer[..buffer.len() - 20],
+                                uncompressed_size as usize,
+                            )?,
+                            None,
+                        )
                     } else {
-                        file_buffer
+                        (file_buffer, None)
                     }
                 } else if &magic[..2] == b"\xE2\x06" {
                     // This is a mangled zlib compressed file
@@ -177,12 +183,25 @@ impl MPKFileReader {
                     let mut decoder = zlib::Decoder::new(&buffer[..end]);
                     let mut result_buffer = vec![];
                     decoder.read_to_end(&mut result_buffer)?;
-                    result_buffer
+                    let is_pyc = &result_buffer[..4] == b"\x03\xf3\r\n";
+                    (
+                        result_buffer,
+                        if is_pyc {
+                            Some(format!("Script/Python/{}.pyc", file.name))
+                        } else {
+                            None
+                        },
+                    )
                 } else {
-                    file_buffer
+                    (file_buffer, None)
                 };
 
-                let out_file_path = out_dir.as_ref().join(file.name.clone());
+                let file_name = if let Some(file_name) = alt_file_name {
+                    file_name
+                } else {
+                    file.name.clone()
+                };
+                let out_file_path = out_dir.as_ref().join(file_name);
                 std::fs::create_dir_all(out_file_path.parent().unwrap())?;
 
                 let mut out_file = std::fs::File::create(&out_file_path)
