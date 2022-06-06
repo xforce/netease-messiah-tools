@@ -14,4 +14,4 @@ byteorder = "1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 lz4_flex = { version = "0.9", default-features = false, features = ["std"] }
-ddsfile = "*"
+ddsfile = "0.5"
