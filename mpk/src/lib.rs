@@ -101,6 +101,79 @@ impl MPKFileReader {
 
     // TODO(alexander): Add interface to operate on files
 
+    fn read_object(reader: &mut std::io::Cursor<&Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+        let t = reader.read_u8()?;
+        if t == 115 {
+            let l = reader.read_u32::<LittleEndian>()?;
+            let mut buf = vec![0; l as usize];
+            reader.read_exact(&mut buf)?;
+            Ok(buf)
+        } else if t == 'y' as u8 {
+            let l = reader.read_u64::<LittleEndian>()?;
+            let l = reader.read_u64::<LittleEndian>()?;
+            Ok(vec![])
+        } else if t == 'l' as u8 {
+            let m_size = reader.read_i32::<LittleEndian>()?;
+            let actualSize = if m_size >= 0 { m_size } else { -m_size };
+            for _ in 0..actualSize {
+                reader.read_u16::<LittleEndian>()?;
+            }
+            Ok(vec![])
+        } else if t == 'u' as u8 {
+            let l = reader.read_u32::<LittleEndian>()?;
+            let mut buf = vec![0; l as usize];
+            reader.read_exact(&mut buf)?;
+            Ok(buf)
+        } else if t == 't' as u8 {
+            let l = reader.read_u32::<LittleEndian>()?;
+            let mut buf = vec![0; l as usize];
+            reader.read_exact(&mut buf)?;
+            Ok(buf)
+
+            // TYPE_TUPLE
+        } else if t == '(' as u8 {
+            //
+            let l = reader.read_u32::<LittleEndian>()?;
+            for _ in 0..l {
+                MPKFileReader::read_object(reader)?;
+            }
+
+            Ok(vec![])
+        } else if t == 'g' as u8 {
+            let l = reader.read_u64::<LittleEndian>()?;
+            Ok(vec![])
+        } else if t == 'N' as u8 {
+            Ok(vec![])
+        } else if t == 'i' as u8 || t == 'R' as u8 {
+            let _ = reader.read_u32::<LittleEndian>()?;
+            Ok(vec![])
+        } else if t == 99 {
+            reader.read_u32::<LittleEndian>()?;
+            reader.read_u32::<LittleEndian>()?;
+            reader.read_u32::<LittleEndian>()?;
+            reader.read_u32::<LittleEndian>()?;
+
+            MPKFileReader::read_object(reader)?; // code
+            MPKFileReader::read_object(reader)?; // consts
+            MPKFileReader::read_object(reader)?; // names
+            MPKFileReader::read_object(reader)?; // varnames
+            MPKFileReader::read_object(reader)?; // freevars
+            MPKFileReader::read_object(reader)?; // cellvars
+            let file_name = MPKFileReader::read_object(reader)?; // filename
+            let name = MPKFileReader::read_object(reader)?; // name
+
+            // eprintln!("{}", std::str::from_utf8(&file_name)?);
+
+            reader.read_u32::<LittleEndian>()?;
+            MPKFileReader::read_object(reader)?; // lnotab
+
+            Ok(file_name)
+        } else {
+            eprintln!("{} {}", t, reader.position());
+            Ok(vec![])
+        }
+    }
+
     pub fn extract_files<P: AsRef<std::path::Path>>(&self, out_dir: P) -> anyhow::Result<()> {
         use indicatif::ProgressBar;
 
@@ -184,14 +257,19 @@ impl MPKFileReader {
                     let mut result_buffer = vec![];
                     decoder.read_to_end(&mut result_buffer)?;
                     let is_pyc = &result_buffer[..4] == b"\x03\xf3\r\n";
-                    (
-                        result_buffer,
-                        if is_pyc {
-                            Some(format!("Script/Python/{}.pyc", file.name))
-                        } else {
-                            None
-                        },
-                    )
+
+                    let result_buffer = if is_pyc {
+                        // Extract filename
+                        let mut reader = std::io::Cursor::new(&result_buffer);
+                        reader.read_u32::<LittleEndian>()?;
+                        reader.read_u32::<LittleEndian>()?;
+                        let file_name = MPKFileReader::read_object(&mut reader)?; // filename
+                        let file_name = std::str::from_utf8(&file_name)?;
+                        (result_buffer, Some(format!("Script/Python/{}", file_name)))
+                    } else {
+                        (result_buffer, None)
+                    };
+                    result_buffer
                 } else {
                     (file_buffer, None)
                 };
