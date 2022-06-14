@@ -1,3 +1,7 @@
 /target
 .vscode/
 unpack/
+*.pyc
+testing/
+__pycache__
+testing2/

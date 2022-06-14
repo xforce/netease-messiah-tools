@@ -56,6 +56,72 @@ def decompile_multiple_files(filenames, out_base):
         x.join()
 
 
+class Counter(object):
+    def __init__(self, initval=0):
+        from multiprocessing import Value, Lock
+        self.val = Value('i', initval)
+        self.lock = Lock()
+
+    def increment(self):
+        with self.lock:
+            self.val.value += 1
+
+    def value(self):
+        with self.lock:
+            return self.val.value
+
+
+def init(l, fp, ff, fo):
+    global lock
+    global files_processed
+    global files_failed
+    global files_okay
+    files_processed = fp
+    files_failed = ff
+    files_okay = fo
+    lock = l
+
+
+def decompile_file_async(filename, out_base):
+    import sys
+    try:
+        lock.acquire()
+        # print("\r", end="")
+        # sys.stdout.write("\033[K")
+        print("okay: %d failed: %d %s" %
+              (files_okay.value(), files_failed.value(), filename))
+        sys.stdout.flush()
+    finally:
+        lock.release()
+
+    try:
+        result = decompile_file(filename, out_base)
+        # lock.acquire()
+        if result:
+            files_okay.increment()
+        else:
+            files_failed.increment()
+    except:
+        files_failed.increment()
+    finally:
+        files_processed.increment()
+        # lock.release()
+
+    try:
+        lock.acquire()
+        # print("\r", end="")
+        # sys.stdout.write("\033[K")
+        print("okay: %d failed: %d %s" %
+              (files_okay.value(), files_failed.value(), filename))
+        sys.stdout.flush()
+    finally:
+        lock.release()
+
+
+def decompile_file_async_unpack(args):
+    return decompile_file_async(*args)
+
+
 if __name__ == "__main__":
     import sys
     import argparse
@@ -67,23 +133,37 @@ if __name__ == "__main__":
     failed = 0
     okay = 0
     last_filename = ''
+
+    from multiprocessing import Pool, Lock
+
+    # Create pool for parallel execution
+    # The lock here is used to synchronize directory create calls
+    lock = Lock()
+    fp = Counter(0)
+    ff = Counter(0)
+    fo = Counter(0)
+    import multiprocessing
+    pool = Pool(int(multiprocessing.cpu_count() / 2),
+                initializer=init, initargs=(lock, fp, ff, fo,))
+
+    init(lock, fp, ff, fo)
+
+    files = []
     for filename in glob.glob(args.glob_pattern, recursive=True):
-        last_filename = filename
-        print("\r", end="")
-        sys.stdout.write("\033[K")
-        print(f"okay: {okay} failed: {failed} {last_filename}", end="\r")
-        sys.stdout.flush()
-        try:
-            if decompile_file(filename, args.out_base):
-                okay += 1
-            else:
-                failed += 1
-        except:
-            failed += 1
+        # Skipping these as it chokes in Uncompyle6, with incredibly high memory usage
+        # They seem to decompuile fine with pycdc so if they are interesting, use that
+        if 'row_x_x_random_names_data' in filename:
+            continue
+        # if 'ukeys_with_table_data.py' in filename:
+        #     continue
+        files.append((filename, args.out_base))
+
+    pool.map_async(decompile_file_async_unpack, files).get(999999)
 
     print("\r", end="")
     sys.stdout.write("\033[K")
-    print(f"okay: {okay} failed: {failed} {last_filename}", end="\r")
+    print(
+        f"total: {files_processed} okay: {files_okay} failed: {files_failed}", end="\r")
     sys.stdout.flush()
 
 # decompile_file.__jit__()

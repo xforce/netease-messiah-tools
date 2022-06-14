@@ -787,6 +787,7 @@ def retarget_file(input, output):
 if __name__ == "__main__":
     import sys
     import argparse
+    import glob
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('glob_pattern', type=str,  help='')
 
@@ -799,10 +800,14 @@ if __name__ == "__main__":
         print(f"{last_filename}", end="\r")
         sys.stdout.flush()
         try:
-            retarget_file(filename, filename)
-            okay += 1
+            file = open(filename, 'rb')
+            head = file.read(8)
+            if head == b"\x03\xf3\x0d\x0a\xff\xff\xff\xff":
+                retarget_file(filename, filename)
+            else:
+                print("Skipping already retargetted file")
         except:
-            failed += 1
+            pass
 
     print("\r", end="")
     sys.stdout.write("\033[K")
