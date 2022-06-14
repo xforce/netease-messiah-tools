@@ -1,5 +1,6 @@
-> **Warning**
-> This is Work in Progress. Things are slightly wrong and/or not verified.
+> **Warning**  
+> This is Work in Progress. I tried by best to accurately map all opcodes but there are 
+> probably still some issues left
 
 | Messiah Opcode | Python 2.7 Opcode | Name | DESC| 
 |---|---|---|---|
@@ -190,7 +191,7 @@
 | 185 |  -  | UNUSED |
 | 186 |  -  | UNUSED |
 | 187 |  -  | UNUSED |
-| 188 |  -  | LOAD_GLOBAL_LOAD_ATTR_LOAD_FAST_LOAD_FAST |
+| 188 |  -  | LOAD_GLOBAL_LOAD_ATTR_LOAD_FAST_LOAD_ATTR_LOAD_FAST_LOAD_FAST |
 | 189 |  -  | LOAD_GLOBAL_LOAD_ATTR_LOAD_ATTR_LOAD_GLOBAL_LOAD_ATTR_LOAD_ATTR |
 | 190 |  -  | LOAD_FAST_LOAT_ATTR_LOAD_CONST_LOAD_CONST_CALL_FUNCTION | TODO: verify
 | 191 |  -  | LOAD_GLOABL_LOAD_ATTR_LOAD_ATTR_COMPARE_OP_LOAD_FAST |
@@ -203,7 +204,7 @@
 | 198 |  -  | LOAD_FAST_LOAD_ATTR_CALL_FUNCTION |
 | 199 |  -  | LOAD_FAST_LOAD_ATTR_RETURN_VALUE |
 | 200 |  -  | LOAD_FAST_LOAD_ATTR_JUMP_IF_FALSE |
-| 201 |  -  | LOAD_FAST_LOAD_FAST_LOAD_FAST_LOAD_FAST_LOAD_FAST |
+| 201 |  -  | LOAD_FAST_LOAD_FAST_LOAD_FAST_LOAD_FAST_LOAD_FAST_LOAD_FAST |
 | 202 |  -  | LOAD_FAST_LOAD_FAST_LOAD_FAST_LOAD_FAST |
 | 203 |  -  | LOAD_FAST_LOAD_ATTR_LOAD_FAST |
 | 204 |  -  | LOAD_GLOBAL_LOAD_ATTR_LOAD_ATTR |
