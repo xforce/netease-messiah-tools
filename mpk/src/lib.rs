@@ -265,7 +265,7 @@ impl MPKFileReader {
                         reader.read_u32::<LittleEndian>()?;
                         let file_name = MPKFileReader::read_object(&mut reader)?; // filename
                         let file_name = std::str::from_utf8(&file_name)?;
-                        (result_buffer, Some(format!("Script/Python/{}", file_name)))
+                        (result_buffer, Some(format!("Script/Python/{}c", file_name)))
                     } else {
                         (result_buffer, None)
                     };
