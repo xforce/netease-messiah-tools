@@ -261,6 +261,7 @@ class _Marshaller:
             self._write(TYPE_STRINGREF)
             self.w_long(v)
         except:
+            self._stringtable.append(x.value)
             self._write(TYPE_INTERNED)
             self.w_long(len(x.value))
             self._write(x.value)
