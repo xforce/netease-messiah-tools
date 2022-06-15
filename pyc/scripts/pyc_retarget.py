@@ -802,7 +802,7 @@ if __name__ == "__main__":
         try:
             file = open(filename, 'rb')
             head = file.read(8)
-            if head == b"\x03\xf3\x0d\x0a\xff\xff\xff\xff":
+            if head != b"\x03\xf3\x0d\x0a\xff\xff\xff\xff":
                 retarget_file(filename, filename)
             else:
                 print("Skipping already retargetted file")
