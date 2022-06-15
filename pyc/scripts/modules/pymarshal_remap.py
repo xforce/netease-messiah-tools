@@ -481,7 +481,7 @@ class _Marshaller:
                         print('ERROR', e)
                         # print(offset_map)
                         pass
-                if op == PY_OPCODES.JUMP_FORWARD or op == PY_OPCODES.SETUP_EXCEPT or op == PY_OPCODES.FOR_ITER or op == PY_OPCODES.SETUP_LOOP:
+                if op == PY_OPCODES.JUMP_FORWARD or op == PY_OPCODES.SETUP_EXCEPT or op == PY_OPCODES.SETUP_WITH or op == PY_OPCODES.FOR_ITER or op == PY_OPCODES.SETUP_LOOP:
                     try:
                         arg = int.from_bytes(
                             out_opcodes[c+1:c+3], byteorder='little', signed=True)
