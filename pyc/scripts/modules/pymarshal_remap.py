@@ -502,12 +502,8 @@ class _Marshaller:
         # Since we insert things
         out_line_info = []
         for (b, l) in line_info:
-            try:
-                out_line_info.append((offset_map[b], l))
-            except:
-                out_line_info.append((b, l))
-
-            return (bytes(out_opcodes), out_line_info)
+            out_line_info.append((offset_map[b], l))
+        return (bytes(out_opcodes), out_line_info)
 
     def dump_set(self, x):
         self._write(TYPE_SET)
