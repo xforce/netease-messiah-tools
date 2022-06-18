@@ -257,7 +257,7 @@ def get_messiah_opcodes():
     def_op('LOAD_FAST_LOAD_ATTR_LOAD_CONST', 205)
     def_op('LOAD_GLOBAL_LOAD_FAST_LOAD_CONST', 206)
     def_op('LOAD_FAST_LOAD_FAST_POP_JUMP_IF_FALSE', 207)
-    def_op('LOAD_FAST_LOAD_FAST_LOAD_CONST_COMPARE_OP', 208)
+    def_op('STORE_FAST_LOAD_FAST_LOAD_CONST_COMPARE_OP', 208)
     def_op('LOAD_FAST_LOAD_CONST_COMPARE_OP_LOAD_FAST', 209)
     def_op('LOAD_DEREF_LOAD_ATTR_LOAD_FAST_BINARY_SUBSCR', 210)
     def_op('STORE_FAST_LOAD_FAST_POP_JUMP_IF_FALSE', 211)
@@ -624,8 +624,8 @@ class PYCRetargeter(object):
                 opc.LOAD_FAST,
                 opc.POP_JUMP_IF_FALSE
             ],
-            messiah_opcodes.LOAD_FAST_LOAD_FAST_LOAD_CONST_COMPARE_OP: [
-                opc.LOAD_FAST,
+            messiah_opcodes.STORE_FAST_LOAD_FAST_LOAD_CONST_COMPARE_OP: [
+                opc.STORE_FAST,
                 opc.LOAD_FAST,
                 opc.LOAD_CONST,
                 opc.COMPARE_OP
