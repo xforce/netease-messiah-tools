@@ -784,6 +784,47 @@ def retarget_file(input, output):
     retargeter.retarget_file(input, output)
 
 
+def retarget_file_async(filename, target_filename):
+    import sys
+    try:
+        lock.acquire()
+        print("\r", end="")
+        sys.stdout.write("\033[K")
+        print(filename, end="\r")
+        sys.stdout.flush()
+    finally:
+        lock.release()
+
+    try:
+        file = open(filename, 'rb')
+        head = file.read(8)
+        if head != b"\x03\xf3\x0d\x0a\xff\xff\xff\xff":
+            retarget_file(filename, filename)
+    except:
+        pass
+
+    import gc
+    gc.collect()
+
+    try:
+        lock.acquire()
+        print("\r", end="")
+        sys.stdout.write("\033[K")
+        print(filename, end='\r')
+        sys.stdout.flush()
+    finally:
+        lock.release()
+
+
+def retarget_file_async_unpack(args):
+    return retarget_file_async(*args)
+
+
+def init(l):
+    global lock
+    lock = l
+
+
 if __name__ == "__main__":
     import sys
     import argparse
@@ -792,27 +833,23 @@ if __name__ == "__main__":
     parser.add_argument('glob_pattern', type=str,  help='')
 
     args = parser.parse_args()
-    last_filename = ''
+    files = []
     for filename in glob.glob(args.glob_pattern, recursive=True):
-        last_filename = filename
-        print("\r", end="")
-        sys.stdout.write("\033[K")
-        print(f"{last_filename}", end="\r")
-        sys.stdout.flush()
-        try:
-            file = open(filename, 'rb')
-            head = file.read(8)
-            if head != b"\x03\xf3\x0d\x0a\xff\xff\xff\xff":
-                retarget_file(filename, filename)
-            else:
-                print("Skipping already retargetted file")
-        except:
-            pass
+        files.append((filename, filename))
 
-    print("\r", end="")
-    sys.stdout.write("\033[K")
-    print(f"{last_filename}", end="\r")
-    sys.stdout.flush()
+    from multiprocessing import Pool, Lock
+
+    # Create pool for parallel execution
+    # The lock here is used to synchronize directory create calls
+    lock = Lock()
+    import multiprocessing
+    pool = Pool(int(multiprocessing.cpu_count() / 2),
+                initializer=init, initargs=(lock,))
+
+    init(lock)
+
+    pool.map_async(retarget_file_async_unpack, files).get(999999)
+
 
 # if __name__ == '__main__':
 #     main()
