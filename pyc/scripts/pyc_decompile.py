@@ -86,10 +86,10 @@ def decompile_file_async(filename, out_base):
     import sys
     try:
         lock.acquire()
-        # print("\r", end="")
-        # sys.stdout.write("\033[K")
+        print("\r", end="")
+        sys.stdout.write("\033[K")
         print("okay: %d failed: %d %s" %
-              (files_okay.value(), files_failed.value(), filename))
+              (files_okay.value(), files_failed.value(), filename), end="\r")
         sys.stdout.flush()
     finally:
         lock.release()
@@ -107,12 +107,15 @@ def decompile_file_async(filename, out_base):
         files_processed.increment()
         # lock.release()
 
+    import gc
+    gc.collect()
+
     try:
         lock.acquire()
-        # print("\r", end="")
-        # sys.stdout.write("\033[K")
+        print("\r", end="")
+        sys.stdout.write("\033[K")
         print("okay: %d failed: %d %s" %
-              (files_okay.value(), files_failed.value(), filename))
+              (files_okay.value(), files_failed.value(), filename), end='\r')
         sys.stdout.flush()
     finally:
         lock.release()
@@ -154,16 +157,21 @@ if __name__ == "__main__":
         # They seem to decompuile fine with pycdc so if they are interesting, use that
         if 'row_x_x_random_names_data' in filename:
             continue
+        if 'space_area_rgb_data' in filename:
+            continue
+        if 'QA_way_point' in filename:
+            continue
+        if 'waypoint_data' in filename:
+            continue
         # if 'ukeys_with_table_data.py' in filename:
         #     continue
         files.append((filename, args.out_base))
 
     pool.map_async(decompile_file_async_unpack, files).get(999999)
 
-    print("\r", end="")
     sys.stdout.write("\033[K")
     print(
-        f"total: {files_processed} okay: {files_okay} failed: {files_failed}", end="\r")
+        f"total: {files_processed.value()} okay: {files_okay.value()} failed: {files_failed.value()}")
     sys.stdout.flush()
 
 # decompile_file.__jit__()
