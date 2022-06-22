@@ -21,9 +21,9 @@ tracing-subscriber = { version = "0.3", features = [
     "tracing-log",
 ] }
 
-rustpython-vm = { git = "https://github.com/xforce/RustPython.git", features = [
+rustpython-vm = { git = "https://github.com/RustPython/RustPython.git", features = [
     "freeze-stdlib",
     "rustpython-compiler",
     "jit",
 ] }
-rustpython-stdlib = { git = "https://github.com/xforce/RustPython.git" }
+rustpython-stdlib = { git = "https://github.com/RustPython/RustPython.git" }
