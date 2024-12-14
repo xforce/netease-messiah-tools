@@ -7,37 +7,37 @@ pub struct File {
     unk1: u16,
     unk2: u16,
     flag: u8,
-    hash: [u8; 16],
+    uuid: [u8; 16],
     name: String,
     folder_index: u16,
     type_index: u16,
-    related_hashes: Vec<[u8; 16]>,
+    dependent_resources: Vec<[u8; 16]>,
 
     folder_path: String,
     type_name: String,
 }
 
 impl File {
-    pub fn hash_file_name(&self) -> String {
+    pub fn uuid_file_name(&self) -> String {
         format!(
             "{:02x}/{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-            self.hash[0],
-            self.hash[0],
-            self.hash[1],
-            self.hash[2],
-            self.hash[3],
-            self.hash[4],
-            self.hash[5],
-            self.hash[6],
-            self.hash[7],
-            self.hash[8],
-            self.hash[9],
-            self.hash[10],
-            self.hash[11],
-            self.hash[12],
-            self.hash[13],
-            self.hash[14],
-            self.hash[15]
+            self.uuid[0],
+            self.uuid[0],
+            self.uuid[1],
+            self.uuid[2],
+            self.uuid[3],
+            self.uuid[4],
+            self.uuid[5],
+            self.uuid[6],
+            self.uuid[7],
+            self.uuid[8],
+            self.uuid[9],
+            self.uuid[10],
+            self.uuid[11],
+            self.uuid[12],
+            self.uuid[13],
+            self.uuid[14],
+            self.uuid[15]
         )
     }
 
@@ -76,6 +76,11 @@ impl Repository {
         let resource_types: Vec<&str> = std::str::from_utf8(&resource_types)?.split(";").collect();
 
         let size_of_paths = reader.read_u16::<LittleEndian>()? as usize;
+        let size_of_paths = if size_of_paths == 0xFFFF {
+            reader.read_u32::<LittleEndian>()? as usize
+        } else {
+            size_of_paths
+        };
         let mut folder_paths = vec![0; size_of_paths];
         reader.read_exact(&mut folder_paths)?;
         let folder_paths: Vec<&str> = std::str::from_utf8(&folder_paths)?.split(";").collect();
@@ -88,7 +93,7 @@ impl Repository {
             file.unk1 = reader.read_u16::<LittleEndian>()?;
             file.unk2 = reader.read_u16::<LittleEndian>()?;
             file.flag = reader.read_u8()?;
-            reader.read_exact(&mut file.hash)?;
+            reader.read_exact(&mut file.uuid)?;
 
             let file_name_size = reader.read_u16::<LittleEndian>()?;
             let mut file_name = vec![0; file_name_size as usize];
@@ -98,11 +103,11 @@ impl Repository {
             file.folder_index = reader.read_u16::<LittleEndian>()?;
             file.type_index = reader.read_u16::<LittleEndian>()?;
 
-            let related_hash_count = reader.read_u16::<LittleEndian>()?;
-            for _ in 0..related_hash_count {
-                let mut hash: [u8; 16] = Default::default();
-                reader.read_exact(&mut hash)?;
-                file.related_hashes.push(hash);
+            let dependent_uuids_count = reader.read_u16::<LittleEndian>()?;
+            for _ in 0..dependent_uuids_count {
+                let mut uuid: [u8; 16] = Default::default();
+                reader.read_exact(&mut uuid)?;
+                file.dependent_resources.push(uuid);
             }
 
             file.folder_path = folder_paths[file.folder_index as usize].to_string();

@@ -1,7 +1,7 @@
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use messiah_resources::Repository;
-use tracing::error;
+use tracing::{error, info};
 use walkdir::WalkDir;
 
 #[derive(Parser)]
@@ -46,8 +46,9 @@ fn main() -> anyhow::Result<()> {
                 repository_path
             };
 
+            let mut failed_counter = 0;
             for file in repository.files() {
-                let file_name = file.hash_file_name();
+                let file_name = file.uuid_file_name();
                 let file_name = if !repository_path.join(&file_name).exists() {
                     let mut j = 0;
                     loop {
@@ -67,14 +68,24 @@ fn main() -> anyhow::Result<()> {
                 let source = repository_path.join(&file_name);
                 let target = target_dir.join(file.file_path());
 
-                std::fs::create_dir_all(target.parent().unwrap())?;
-
+                if source.exists() {
+                    std::fs::create_dir_all(target.parent().unwrap())?;
+                }
                 if let Err(e) = std::fs::rename(&source, &target)
                     .with_context(|| format!("{} -> {}", source.display(), target.display()))
                 {
-                    error!("{:?}", e);
+                    failed_counter += 1;
+                    // error!("{:?}", e);
+                } else {
+                    info!("Moved file {:?}", target);
                 }
             }
+
+            info!(
+                "Moved {} out of {} files",
+                repository.files().len() - failed_counter,
+                repository.files().len()
+            );
 
             // Cleanup empty directories
             for entry in WalkDir::new(repository_path) {
