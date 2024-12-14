@@ -1,5 +1,4 @@
 use clap::Parser;
-use glob;
 use std::{fmt::Debug, io::Read};
 use tracing::{error, info};
 
@@ -18,7 +17,7 @@ struct Args {
     )]
     out_base: Option<String>,
 
-    #[clap(help = "Run decompile", short, long, takes_value = false)]
+    #[clap(help = "Run decompile", short, long)]
     decompile: bool,
 }
 
@@ -37,33 +36,27 @@ fn run() -> anyhow::Result<()> {
     // For retrigger build on changes :)
     std::include_str!("../scripts/modules/pymarshal_remap.py");
 
-    vm::Interpreter::with_init(settings, |vm| {
-        vm.add_native_modules(rustpython_stdlib::get_module_inits());
-        vm.add_frozen(rustpython_vm::py_freeze!(dir = "scripts/modules"));
-    })
-    .enter(|vm| {
+    let interp = rustpython::InterpreterConfig::new()
+        .init_stdlib()
+        .init_hook(Box::new(|vm| {
+            vm.add_native_modules(rustpython_stdlib::get_module_inits());
+            vm.add_frozen(rustpython_vm::py_freeze!(dir = "scripts/modules"));
+        }))
+        .interpreter();
+
+    interp.enter(|vm| {
         let scope = vm.new_scope_with_builtins();
 
         let pyc_retarget = std::include_str!("../scripts/pyc_retarget.py");
         let pyc_decompile = std::include_str!("../scripts/pyc_decompile.py");
 
-        // let code = vm
-        //     .compile_with_opts(
-        //         &pymarshal,
-        //         vm::compile::Mode::Exec,
-        //         "pymarshal_remap.py".to_string(),
-        //         vm.compile_opts(),
-        //     )
-        //     .unwrap();
-        // import_codeobj(vm, "pymarshal_remap", code, false).unwrap();
-
         let code_obj = vm
             .compile(
                 pyc_retarget,
-                vm::compile::Mode::Exec,
+                vm::compiler::Mode::Exec,
                 "<embedded>".to_owned(),
             )
-            .map_err(|err| vm.new_syntax_error(&err));
+            .map_err(|err| vm.new_syntax_error(&err, None));
         if let Err(e) = &code_obj {
             vm.print_exception(e.clone());
             anyhow::bail!("Failed to load retargeter");
@@ -77,10 +70,10 @@ fn run() -> anyhow::Result<()> {
         let code_obj = vm
             .compile(
                 pyc_decompile,
-                vm::compile::Mode::Exec,
+                vm::compiler::Mode::Exec,
                 "<embedded_decompiler>".to_owned(),
             )
-            .map_err(|err| vm.new_syntax_error(&err));
+            .map_err(|err| vm.new_syntax_error(&err, None));
         if let Err(e) = &code_obj {
             vm.print_exception(e.clone());
             anyhow::bail!("Failed to load decompiler");
@@ -102,14 +95,15 @@ fn run() -> anyhow::Result<()> {
 
         let mut file_success = 0;
         let mut file_failed = 0;
-        let mut files_processed = 0;
 
         let globs = glob::glob(&args.inputs).expect("Failed to read glob pattern");
         let total_files = globs.count();
 
-        for entry in glob::glob(&args.inputs).expect("Failed to read glob pattern") {
+        for (files_processed, entry) in glob::glob(&args.inputs)
+            .expect("Failed to read glob pattern")
+            .enumerate()
+        {
             info!("{}/{}", files_processed, total_files);
-            files_processed += 1;
             match entry {
                 Ok(path) => {
                     info!("Processing {:?}", path.display());
@@ -127,9 +121,9 @@ fn run() -> anyhow::Result<()> {
                         if let Some(parent) = target.parent() {
                             std::fs::create_dir_all(parent)?;
                         }
-                        if let Err(e) = vm.invoke(
-                            &retarget_file,
+                        if let Err(e) = retarget_file.call(
                             (path.display().to_string(), target.display().to_string()),
+                            vm,
                         ) {
                             vm.print_exception(e.clone());
                         }
@@ -151,7 +145,7 @@ fn run() -> anyhow::Result<()> {
                     if args.decompile {
                         info!("Decompiling");
                         let target = std::path::Path::new(&out_base).join(&path);
-                        match vm.invoke(&decompile_file, (target.display().to_string(),)) {
+                        match decompile_file.call((target.display().to_string(),), vm) {
                             Ok(v) => {
                                 if !v.is_true(vm).unwrap() {
                                     error!("Decompile of {} failed", target.display());
@@ -181,7 +175,6 @@ fn run() -> anyhow::Result<()> {
 fn main() -> anyhow::Result<()> {
     use tracing_subscriber::{filter::EnvFilter, FmtSubscriber};
 
-    #[macro_export]
     macro_rules! safe_unwrap {
         ($result:expr) => {
             $result.unwrap()

@@ -6,3 +6,4 @@ testing/
 __pycache__
 testing2/
 py_decompile/
+test_data

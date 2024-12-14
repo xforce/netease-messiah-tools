@@ -83,6 +83,7 @@ impl Repository {
         let mut files: Vec<File> = Vec::new();
         while reader.fill_buf().map(|b| !b.is_empty())? {
             //
+            // TODO(alexander): Move this to file and have a from_reader thing or something
             let mut file: File = Default::default();
             file.unk1 = reader.read_u16::<LittleEndian>()?;
             file.unk2 = reader.read_u16::<LittleEndian>()?;

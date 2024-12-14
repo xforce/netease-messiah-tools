@@ -67,7 +67,7 @@ fn main() -> anyhow::Result<()> {
                 let source = repository_path.join(&file_name);
                 let target = target_dir.join(file.file_path());
 
-                std::fs::create_dir_all(&target.parent().unwrap())?;
+                std::fs::create_dir_all(target.parent().unwrap())?;
 
                 if let Err(e) = std::fs::rename(&source, &target)
                     .with_context(|| format!("{} -> {}", source.display(), target.display()))

@@ -88,12 +88,12 @@ fn main() -> anyhow::Result<()> {
 
             enum Format {
                 D3D(ddsfile::D3DFormat),
-                DXGI(ddsfile::DxgiFormat),
+                Dxgi(ddsfile::DxgiFormat),
             }
 
             impl From<ddsfile::DxgiFormat> for Format {
                 fn from(other: ddsfile::DxgiFormat) -> Self {
-                    Self::DXGI(other)
+                    Self::Dxgi(other)
                 }
             }
 
@@ -185,7 +185,7 @@ fn main() -> anyhow::Result<()> {
                     mipmap_levels: Some(num_mip_levels as u32),
                     caps2: None,
                 })?,
-                Format::DXGI(format) => ddsfile::Dds::new_dxgi(ddsfile::NewDxgiParams {
+                Format::Dxgi(format) => ddsfile::Dds::new_dxgi(ddsfile::NewDxgiParams {
                     height: height as u32,
                     width: width as u32,
                     depth: None,
@@ -228,8 +228,8 @@ fn main() -> anyhow::Result<()> {
                     let uncompressed_size = reader.read_u32::<LittleEndian>()?;
                     let mut buf = vec![0; mip_size_in_bytes as usize - 24];
                     reader.read_exact(&mut buf)?;
-                    let texture_data = lz4_flex::decompress(&buf, uncompressed_size as usize)?;
-                    texture_data
+
+                    lz4_flex::decompress(&buf, uncompressed_size as usize)?
                 } else {
                     error!("Unknown texture data format: {:?}", &magic);
                     vec![]

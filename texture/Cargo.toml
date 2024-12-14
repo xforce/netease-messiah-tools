@@ -7,11 +7,11 @@ edition = "2021"
 
 [dependencies]
 static_assertions = "1.1.0"
-num_enum = "0.5"
+num_enum = "0.7"
 anyhow = "1"
-clap = { version = "3", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
 byteorder = "1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-lz4_flex = { version = "0.9", default-features = false, features = ["std"] }
+lz4_flex = { version = "0.11", default-features = false, features = ["std"] }
 ddsfile = "0.5"

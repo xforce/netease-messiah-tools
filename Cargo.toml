@@ -1,2 +1,3 @@
 [workspace]
 members = ["mpk", "texture", "resources", "pyc"]
+resolver = "2"

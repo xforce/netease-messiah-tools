@@ -54,12 +54,13 @@ pub struct MPKFileReader {
 }
 
 impl MPKFileReader {
-    pub fn new<P: AsRef<std::path::Path>>(path: P) -> anyhow::Result<Self>
-    where
-        P: Debug,
-    {
-        let file = std::fs::File::open(&path)
-            .with_context(|| format!("Failed to read .mpkinfo file from {:?}", path))?;
+    pub fn new<P: AsRef<std::path::Path>>(path: P) -> anyhow::Result<Self> {
+        let file = std::fs::File::open(&path).with_context(|| {
+            format!(
+                "Failed to read .mpkinfo file from {}",
+                path.as_ref().to_string_lossy()
+            )
+        })?;
         let mut reader = BufReader::new(&file);
         let header = MPKFileHeader::read_header(&mut reader)?;
 
@@ -108,30 +109,25 @@ impl MPKFileReader {
             let mut buf = vec![0; l as usize];
             reader.read_exact(&mut buf)?;
             Ok(buf)
-        } else if t == 'y' as u8 {
-            let l = reader.read_u64::<LittleEndian>()?;
-            let l = reader.read_u64::<LittleEndian>()?;
+        } else if t == b'y' {
+            let _ = reader.read_u64::<LittleEndian>()?;
+            let _ = reader.read_u64::<LittleEndian>()?;
             Ok(vec![])
-        } else if t == 'l' as u8 {
+        } else if t == b'l' {
             let m_size = reader.read_i32::<LittleEndian>()?;
-            let actualSize = if m_size >= 0 { m_size } else { -m_size };
-            for _ in 0..actualSize {
+            let actual_size = if m_size >= 0 { m_size } else { -m_size };
+            for _ in 0..actual_size {
                 reader.read_u16::<LittleEndian>()?;
             }
             Ok(vec![])
-        } else if t == 'u' as u8 {
+        } else if t == b'u' || t == b't'
+        /* t: TYPE TUPLE */
+        {
             let l = reader.read_u32::<LittleEndian>()?;
             let mut buf = vec![0; l as usize];
             reader.read_exact(&mut buf)?;
             Ok(buf)
-        } else if t == 't' as u8 {
-            let l = reader.read_u32::<LittleEndian>()?;
-            let mut buf = vec![0; l as usize];
-            reader.read_exact(&mut buf)?;
-            Ok(buf)
-
-            // TYPE_TUPLE
-        } else if t == '(' as u8 {
+        } else if t == b'(' {
             //
             let l = reader.read_u32::<LittleEndian>()?;
             for _ in 0..l {
@@ -139,12 +135,12 @@ impl MPKFileReader {
             }
 
             Ok(vec![])
-        } else if t == 'g' as u8 {
-            let l = reader.read_u64::<LittleEndian>()?;
+        } else if t == b'g' {
+            let _ = reader.read_u64::<LittleEndian>()?;
             Ok(vec![])
-        } else if t == 'N' as u8 {
+        } else if t == b'N' {
             Ok(vec![])
-        } else if t == 'i' as u8 || t == 'R' as u8 {
+        } else if t == b'i' || t == b'R' {
             let _ = reader.read_u32::<LittleEndian>()?;
             Ok(vec![])
         } else if t == 99 {
@@ -160,9 +156,7 @@ impl MPKFileReader {
             MPKFileReader::read_object(reader)?; // freevars
             MPKFileReader::read_object(reader)?; // cellvars
             let file_name = MPKFileReader::read_object(reader)?; // filename
-            let name = MPKFileReader::read_object(reader)?; // name
-
-            // eprintln!("{}", std::str::from_utf8(&file_name)?);
+            let _name = MPKFileReader::read_object(reader)?; // name
 
             reader.read_u32::<LittleEndian>()?;
             MPKFileReader::read_object(reader)?; // lnotab
@@ -216,7 +210,7 @@ impl MPKFileReader {
                     let _ = reader.read_exact(&mut magic);
                     if magic == b"ZZZ4" {
                         let uncompressed_size = reader.read_i32::<LittleEndian>()?;
-                        let mut buffer = vec![0; 0 as usize];
+                        let mut buffer = vec![0; 0_usize];
                         reader.read_to_end(&mut buffer)?;
                         // There is an unknown "overhang" of 20 bytes at the end, no idea what it is
                         // Ignore for now
@@ -236,7 +230,7 @@ impl MPKFileReader {
                     // TODO(alexander): Move handling of these to a new crate
                     // TODO(alexander): Reduce number of vec allocations
                     reader.seek(SeekFrom::Start(0))?;
-                    let mut buffer = vec![0; 0 as usize];
+                    let mut buffer = vec![0; 0_usize];
                     reader.read_to_end(&mut buffer)?;
 
                     let offset = (buffer.len() - 8) % 37;
@@ -245,7 +239,7 @@ impl MPKFileReader {
                     // eprintln!("{} {} {}", buffer.len(), offset, end);
                     let head = &mut buffer[..end];
                     for x in head.iter_mut() {
-                        *x = *x ^ 154;
+                        *x ^= 154;
                     }
                     let end = if end == buffer.len() {
                         end
@@ -256,9 +250,11 @@ impl MPKFileReader {
                     let mut decoder = zlib::Decoder::new(&buffer[..end]);
                     let mut result_buffer = vec![];
                     decoder.read_to_end(&mut result_buffer)?;
+
+                    // Check the decoded magic for pyc, if it's pyc we would like to move this file elsewhere
                     let is_pyc = &result_buffer[..4] == b"\x03\xf3\r\n";
 
-                    let result_buffer = if is_pyc {
+                    if is_pyc {
                         // Extract filename
                         let mut reader = std::io::Cursor::new(&result_buffer);
                         reader.read_u32::<LittleEndian>()?;
@@ -268,8 +264,7 @@ impl MPKFileReader {
                         (result_buffer, Some(format!("Script/Python/{}c", file_name)))
                     } else {
                         (result_buffer, None)
-                    };
-                    result_buffer
+                    }
                 } else {
                     (file_buffer, None)
                 };
