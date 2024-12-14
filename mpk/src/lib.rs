@@ -222,6 +222,23 @@ impl MPKFileReader {
                             )?,
                             None,
                         )
+                    } else if magic == b"LZMA" {
+                        let uncompressed_size = reader.read_i32::<LittleEndian>()?;
+                        let mut buffer = vec![0; 0_usize];
+                        reader.read_to_end(&mut buffer)?;
+                        let mut decompressed = vec![];
+                        lzma_rs::lzma_decompress_with_options(
+                            &mut std::io::Cursor::new(&buffer),
+                            &mut decompressed,
+                            &lzma_rs::decompress::Options {
+                                unpacked_size: lzma_rs::decompress::UnpackedSize::UseProvided(
+                                    Some(uncompressed_size as u64),
+                                ),
+                                memlimit: None,
+                                allow_incomplete: false,
+                            },
+                        )?;
+                        (decompressed, None)
                     } else {
                         (file_buffer, None)
                     }

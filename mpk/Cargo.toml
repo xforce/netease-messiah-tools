@@ -18,3 +18,4 @@ indicatif = "0.17"
 lz4_flex = { version = "0.11", default-features = false, features = ["std"] }
 walkdir = "2"
 compress = "0.2"
+lzma-rs = "0.3"
