@@ -1,7 +1,5 @@
-import types
 from io import BytesIO
 from py_27_opcodes import get_python_27_opcodes
-import traceback
 
 PY_OPCODES = get_python_27_opcodes()
 
