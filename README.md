@@ -4,8 +4,15 @@
 
 ## ⚡️ Supported Games
 
-* <h3>Diablo Immortal</h3>
-
+* Diablo Immortal
+  * ✅ MPK Archive
+  * ✅ Resource Repositories
+  * 🟨 Python Scripts (old versions only, engine switched to newer Python Version)
+    
+* Ace Racer
+  * ✅ MPK Archive
+  * ✅ Resource Repositories
+  * ✅ Python Scripts
 
 ## Supported File Types
 
