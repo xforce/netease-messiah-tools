@@ -53,6 +53,32 @@ pub struct MPKFileReader {
     files: Vec<MPKFileEntry>,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum PythonVersion {
+    Version2_0,
+    Version2_1,
+    Version2_2,
+    Version2_3,
+    Version2_4,
+    Version2_5,
+    Version2_6,
+    Version2_7,
+    Version3_0,
+    Version3_1,
+    Version3_2,
+    Version3_3,
+    Version3_4,
+    Version3_5,
+    Version3_6,
+    Version3_7,
+    Version3_8,
+    Version3_9,
+    Version3_10,
+    Version3_11,
+    Version3_12,
+    Version3_13,
+}
+
 impl MPKFileReader {
     pub fn new<P: AsRef<std::path::Path>>(path: P) -> anyhow::Result<Self> {
         let file = std::fs::File::open(&path).with_context(|| {
@@ -102,70 +128,236 @@ impl MPKFileReader {
 
     // TODO(alexander): Add interface to operate on files
 
-    fn read_object(reader: &mut std::io::Cursor<&Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    fn read_object(
+        reader: &mut std::io::Cursor<&Vec<u8>>,
+        version: PythonVersion,
+    ) -> anyhow::Result<Vec<u8>> {
+        const TYPE_NULL: u8 = b'0';
+        const TYPE_NONE: u8 = b'N';
+        const TYPE_FALSE: u8 = b'F';
+        const TYPE_TRUE: u8 = b'T';
+        const TYPE_STOPITER: u8 = b'S';
+        const TYPE_ELLIPSIS: u8 = b'.';
+        const TYPE_INT: u8 = b'i';
+        const TYPE_FLOAT: u8 = b'f';
+        const TYPE_BINARY_FLOAT: u8 = b'g';
+        const TYPE_COMPLEX: u8 = b'x';
+        const TYPE_BINARY_COMPLEX: u8 = b'y';
+        const TYPE_LONG: u8 = b'l';
+        const TYPE_STRING: u8 = b's';
+        const TYPE_INTERNED: u8 = b't';
+        const TYPE_REF: u8 = b'r';
+        const TYPE_TUPLE: u8 = b'(';
+        const TYPE_LIST: u8 = b'[';
+        const _TYPE_DICT: u8 = b'{';
+        const TYPE_CODE: u8 = b'c';
+        const TYPE_UNICODE: u8 = b'u';
+        const _TYPE_UNKNOWN: u8 = b'?';
+        const TYPE_SET: u8 = b'<';
+        const TYPE_FROZENSET: u8 = b'>';
+        const TYPE_ASCII: u8 = b'a';
+        const TYPE_ASCII_INTERNED: u8 = b'A';
+        const TYPE_SMALL_TUPLE: u8 = b')';
+        const TYPE_SHORT_ASCII: u8 = b'z';
+        const TYPE_SHORT_ASCII_INTERNED: u8 = b'Z';
+
         let t = reader.read_u8()?;
-        if t == 115 {
-            let l = reader.read_u32::<LittleEndian>()?;
-            let mut buf = vec![0; l as usize];
-            reader.read_exact(&mut buf)?;
-            Ok(buf)
-        } else if t == b'y' {
-            let _ = reader.read_u64::<LittleEndian>()?;
-            let _ = reader.read_u64::<LittleEndian>()?;
-            Ok(vec![])
-        } else if t == b'l' {
-            let m_size = reader.read_i32::<LittleEndian>()?;
-            let actual_size = if m_size >= 0 { m_size } else { -m_size };
-            for _ in 0..actual_size {
-                reader.read_u16::<LittleEndian>()?;
+        let t = t & 0x7F;
+        match t {
+            TYPE_BINARY_COMPLEX => {
+                let _ = reader.read_u64::<LittleEndian>()?;
+                let _ = reader.read_u64::<LittleEndian>()?;
+                Ok(vec![])
             }
-            Ok(vec![])
-        } else if t == b'u' || t == b't'
-        /* t: TYPE TUPLE */
-        {
-            let l = reader.read_u32::<LittleEndian>()?;
-            let mut buf = vec![0; l as usize];
-            reader.read_exact(&mut buf)?;
-            Ok(buf)
-        } else if t == b'(' {
-            //
-            let l = reader.read_u32::<LittleEndian>()?;
-            for _ in 0..l {
-                MPKFileReader::read_object(reader)?;
+            TYPE_LONG => {
+                let m_size = reader.read_i32::<LittleEndian>()?;
+                let actual_size = if m_size >= 0 { m_size } else { -m_size };
+                for _ in 0..actual_size {
+                    reader.read_u16::<LittleEndian>()?;
+                }
+                Ok(vec![])
             }
+            TYPE_STRING => {
+                let l = reader.read_u32::<LittleEndian>()?;
+                let mut buf = vec![0; l as usize];
+                reader.read_exact(&mut buf)?;
+                Ok(buf)
+            }
+            TYPE_UNICODE => {
+                let l = reader.read_u32::<LittleEndian>()?;
+                let mut buf = vec![0; l as usize];
+                reader.read_exact(&mut buf)?;
+                Ok(buf)
+            }
+            TYPE_INTERNED => {
+                let l = reader.read_u32::<LittleEndian>()?;
+                let mut buf = vec![0; l as usize];
+                reader.read_exact(&mut buf)?;
+                Ok(buf)
+            }
+            TYPE_TUPLE | TYPE_LIST => {
+                let l = reader.read_u32::<LittleEndian>()?;
+                let mut name = vec![];
+                for _ in 0..l {
+                    let n = MPKFileReader::read_object(reader, version)?;
+                    if !n.is_empty() {
+                        name = n;
+                    }
+                }
+                Ok(name)
+            }
+            TYPE_SMALL_TUPLE => {
+                let l = reader.read_u8()?;
+                let mut name = vec![];
+                for _ in 0..l {
+                    let n = MPKFileReader::read_object(reader, version)?;
+                    if !n.is_empty() {
+                        name = n;
+                    }
+                }
+                Ok(name)
+            }
+            TYPE_BINARY_FLOAT => {
+                let _ = reader.read_u64::<LittleEndian>()?;
+                Ok(vec![])
+            }
+            TYPE_FLOAT => {
+                let l = reader.read_u8()?;
+                reader.seek_relative(l as i64)?;
+                Ok(vec![])
+            }
+            TYPE_COMPLEX => {
+                let l = reader.read_u8()?;
+                reader.seek_relative(l as i64)?;
+                let l = reader.read_u8()?;
+                reader.seek_relative(l as i64)?;
+                Ok(vec![])
+            }
+            TYPE_INT | b'R' => {
+                let _ = reader.read_u32::<LittleEndian>()?;
+                Ok(vec![])
+            }
+            TYPE_REF => {
+                let _ = reader.read_u32::<LittleEndian>()?;
+                Ok(vec![])
+            }
+            TYPE_SHORT_ASCII | TYPE_SHORT_ASCII_INTERNED => {
+                let l = reader.read_u8()?;
+                let mut buf = vec![0; l as usize];
+                reader.read_exact(&mut buf)?;
+                Ok(buf)
+            }
+            TYPE_ASCII | TYPE_ASCII_INTERNED => {
+                let l = reader.read_u32::<LittleEndian>()?;
+                let mut buf = vec![0; l as usize];
+                reader.read_exact(&mut buf)?;
+                Ok(buf)
+            }
+            TYPE_FROZENSET | TYPE_SET => {
+                let n = reader.read_u32::<LittleEndian>()?;
+                let mut name = vec![];
+                for _ in 0..n {
+                    let n = MPKFileReader::read_object(reader, version)?;
+                    if !n.is_empty() {
+                        name = n;
+                    }
+                }
+                Ok(name)
+            }
+            TYPE_NONE | TYPE_TRUE | TYPE_FALSE | TYPE_ELLIPSIS | TYPE_NULL | TYPE_STOPITER => {
+                Ok(vec![])
+            }
+            TYPE_CODE => {
+                let _argcount = reader.read_u32::<LittleEndian>()?; // argcount
+                let _posonlyargcount = reader.read_u32::<LittleEndian>()?;
+                let _kwonlyargcount = reader.read_u32::<LittleEndian>()?;
+                let _stacksize = reader.read_u32::<LittleEndian>()?;
 
-            Ok(vec![])
-        } else if t == b'g' {
-            let _ = reader.read_u64::<LittleEndian>()?;
-            Ok(vec![])
-        } else if t == b'N' {
-            Ok(vec![])
-        } else if t == b'i' || t == b'R' {
-            let _ = reader.read_u32::<LittleEndian>()?;
-            Ok(vec![])
-        } else if t == 99 {
-            reader.read_u32::<LittleEndian>()?;
-            reader.read_u32::<LittleEndian>()?;
-            reader.read_u32::<LittleEndian>()?;
-            reader.read_u32::<LittleEndian>()?;
+                // 3.11
+                if version == PythonVersion::Version3_11 {
+                    let _flags = reader.read_u32::<LittleEndian>()?;
+                }
 
-            MPKFileReader::read_object(reader)?; // code
-            MPKFileReader::read_object(reader)?; // consts
-            MPKFileReader::read_object(reader)?; // names
-            MPKFileReader::read_object(reader)?; // varnames
-            MPKFileReader::read_object(reader)?; // freevars
-            MPKFileReader::read_object(reader)?; // cellvars
-            let file_name = MPKFileReader::read_object(reader)?; // filename
-            let _name = MPKFileReader::read_object(reader)?; // name
+                MPKFileReader::read_object(reader, version)?; // code
+                let _file_name_consts = MPKFileReader::read_object(reader, version)?; // consts
+                MPKFileReader::read_object(reader, version)?; // names
+                                                              // 3.11
+                let file_name = if version == PythonVersion::Version3_11 {
+                    MPKFileReader::read_object(reader, version)?; // localsplusnames
+                    MPKFileReader::read_object(reader, version)?; // localspluskinds
+                    let file_name = MPKFileReader::read_object(reader, version)?; // filename
+                    MPKFileReader::read_object(reader, version)?; // name
+                    MPKFileReader::read_object(reader, version)?; // qualname
+                    reader.read_u32::<LittleEndian>()?; // firstlineno
+                    MPKFileReader::read_object(reader, version)?; // linetable
+                    MPKFileReader::read_object(reader, version)?; // exceptiontable
+                    file_name
+                } else if version == PythonVersion::Version2_7 {
+                    MPKFileReader::read_object(reader, version)?; // varnames
+                    MPKFileReader::read_object(reader, version)?; // freevars
+                    MPKFileReader::read_object(reader, version)?; // cellvars
+                    let file_name = MPKFileReader::read_object(reader, version)?; // filename
+                    let _name = MPKFileReader::read_object(reader, version)?; // name
 
-            reader.read_u32::<LittleEndian>()?;
-            MPKFileReader::read_object(reader)?; // lnotab
+                    reader.read_u32::<LittleEndian>()?;
+                    MPKFileReader::read_object(reader, version)?; // lnotab
+                    file_name
+                } else {
+                    vec![]
+                };
 
-            Ok(file_name)
-        } else {
-            eprintln!("{} {}", t, reader.position());
-            Ok(vec![])
+                let file_name = if file_name.is_empty() {
+                    file_name
+                } else {
+                    file_name
+                };
+                Ok(file_name)
+            }
+            _ => {
+                panic!("Error {}", t);
+            }
         }
+    }
+
+    fn detect_python_version_from_py_header(
+        buffer: &[u8],
+    ) -> anyhow::Result<Option<PythonVersion>> {
+        let version_ranges = [
+            (50823, 50823, PythonVersion::Version2_0),
+            (60202, 60202, PythonVersion::Version2_1),
+            (60717, 60717, PythonVersion::Version2_2),
+            (62011, 62021, PythonVersion::Version2_3),
+            (62041, 62061, PythonVersion::Version2_4),
+            (62071, 62131, PythonVersion::Version2_5),
+            (62151, 62161, PythonVersion::Version2_6),
+            (62171, 62211, PythonVersion::Version2_7),
+            (3000, 3131, PythonVersion::Version3_0),
+            (3141, 3151, PythonVersion::Version3_1),
+            (3160, 3180, PythonVersion::Version3_2),
+            (3190, 3230, PythonVersion::Version3_3),
+            (3250, 3310, PythonVersion::Version3_4),
+            (3320, 3351, PythonVersion::Version3_5),
+            (3360, 3379, PythonVersion::Version3_6),
+            (3390, 3399, PythonVersion::Version3_7),
+            (3400, 3419, PythonVersion::Version3_8),
+            (3420, 3429, PythonVersion::Version3_9),
+            (3430, 3449, PythonVersion::Version3_10),
+            (3450, 3499, PythonVersion::Version3_11),
+            (3500, 3549, PythonVersion::Version3_12),
+            (3550, 3599, PythonVersion::Version3_13),
+        ];
+
+        let mut reader = BufReader::new(std::io::Cursor::new(&buffer));
+        let value = reader.read_u16::<LittleEndian>()?;
+        if &buffer[2..4] != b"\r\n" {
+            return Ok(None);
+        }
+        for (version_min, version_max, version) in version_ranges {
+            if value >= version_min && value <= version_max {
+                return Ok(Some(version));
+            }
+        }
+        return Ok(None);
     }
 
     pub fn extract_files<P: AsRef<std::path::Path>>(&self, out_dir: P) -> anyhow::Result<()> {
@@ -269,16 +461,39 @@ impl MPKFileReader {
                     decoder.read_to_end(&mut result_buffer)?;
 
                     // Check the decoded magic for pyc, if it's pyc we would like to move this file elsewhere
-                    let is_pyc = &result_buffer[..4] == b"\x03\xf3\r\n";
-
-                    if is_pyc {
+                    let python_version =
+                        Self::detect_python_version_from_py_header(&result_buffer)?;
+                    if let Some(python_version) = python_version {
                         // Extract filename
-                        let mut reader = std::io::Cursor::new(&result_buffer);
-                        reader.read_u32::<LittleEndian>()?;
-                        reader.read_u32::<LittleEndian>()?;
-                        let file_name = MPKFileReader::read_object(&mut reader)?; // filename
-                        let file_name = std::str::from_utf8(&file_name)?;
-                        (result_buffer, Some(format!("Script/Python/{}c", file_name)))
+                        let new_file_name = match python_version {
+                            PythonVersion::Version2_7 => {
+                                let mut reader = std::io::Cursor::new(&result_buffer);
+                                reader.read_u32::<LittleEndian>()?;
+                                reader.read_u32::<LittleEndian>()?;
+                                let file_name =
+                                    MPKFileReader::read_object(&mut reader, python_version)?; // filename
+                                file_name
+                            }
+                            PythonVersion::Version3_11 => {
+                                let mut reader = std::io::Cursor::new(&result_buffer);
+                                reader.read_u32::<LittleEndian>()?;
+                                reader.read_u32::<LittleEndian>()?;
+                                let file_name =
+                                    MPKFileReader::read_object(&mut reader, python_version)?; // filename
+                                file_name
+                            }
+                            _ => vec![],
+                        };
+
+                        if new_file_name.is_empty() {
+                            (result_buffer, None)
+                        } else {
+                            let new_file_name = std::str::from_utf8(&new_file_name)?;
+                            (
+                                result_buffer,
+                                Some(format!("Script/Python/{}c", new_file_name)),
+                            )
+                        }
                     } else {
                         (result_buffer, None)
                     }
