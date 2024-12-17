@@ -9,13 +9,12 @@ edition = "2021"
 clap = { version = "4.5.23", features = ["derive"] }
 simple_logger = "5.0"
 log = "0.4"
-bytesize = "1"
 byteorder = "1"
 thiserror = "2"
 anyhow = { version = "1", features = ["backtrace"] }
 try-insert-ext = "*"
 indicatif = "0.17"
 lz4_flex = { version = "0.11", default-features = false, features = ["std"] }
-walkdir = "2"
 compress = "0.2"
 lzma-rs = "0.3"
+tree_magic_mini = "3.1.6"
